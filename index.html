@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Konklave Komplett</title>
+
+<style>
+body {
+    font-family: Arial;
+    text-align: center;
+    background: #f4f4f4;
+}
+
+/* ===== KANDIDATEN ===== */
+
+.container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.card {
+    width: 130px;
+    background: white;
+    border: 1px solid #aaa;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    position: relative;
+}
+
+.img {
+    width: 100%;
+    height: 110px;
+    background: #ddd;
+    background-size: cover;
+    background-position: center;
+}
+
+.name {
+    font-size: 14px;
+    font-weight: bold;
+    padding: 2px;
+}
+
+.bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #eee;
+    padding: 2px;
+    font-size: 11px;
+}
+
+.left {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.badge {
+    background: black;
+    color: white;
+    padding: 1px 4px;
+    font-size: 11px;
+}
+
+.type {
+    padding: 1px 4px;
+    color: white;
+    font-size: 11px;
+}
+
+.delete-btn {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    background: red;
+    color: white;
+    border: none;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+/* ===== MATRIX ===== */
+
+.topbar {
+    margin-bottom: 10px;
+}
+
+table {
+    border-collapse: collapse;
+    margin: auto;
+    background: white;
+}
+
+th, td {
+    border: 1px solid #aaa;
+    padding: 6px;
+    min-width: 70px;
+}
+
+input {
+    width: 60px;
+    text-align: center;
+    border: none;
+    font-size: 14px;
+}
+
+.gold {
+    outline: 3px solid gold;
+    background: #fff8dc;
+}
+
+.need {
+    font-size: 11px;
+    color: #555;
+}
+
+button {
+    margin: 5px;
+    padding: 6px 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Konklave</h2>
+
+<!-- ===== KANDIDATEN ===== -->
+<button onclick="addCard()">+ Kandidat</button>
+<div class="container" id="container"></div>
+
+<hr>
+
+<!-- ===== MATRIX ===== -->
+<div class="topbar">
+    Wähler gesamt: 
+    <input type="number" id="total" value="120" oninput="updateThreshold()">
+    
+    → 2/3 = 
+    <span id="thresholdDisplay">80</span> Stimmen
+</div>
+
+<button onclick="addCandidate()">+ Kandidat (Matrix)</button>
+<button onclick="addRound()">+ Wahlgang</button>
+
+<table>
+    <thead>
+        <tr id="header">
+            <th>WG</th>
+            <th>Info</th>
+        </tr>
+    </thead>
+    <tbody id="body"></tbody>
+</table>
+
+<script>
+
+/* ===== KANDIDATEN CODE ===== */
+
+const maxCards = 10;
+
+const colors = {
+    ERZ: "#002060",
+    TRA: "#0050ff",
+    KON: "#66b3ff",
+    MOD: "#ffd700",
+    REF: "#ff9999",
+    LIB: "#ff3333",
+    PRO: "#8b0000"
+};
+
+function createCard() {
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+        <button class="delete-btn" onclick="this.parentElement.remove()">X</button>
+
+        <div class="img" onclick="uploadImage(this)"></div>
+
+        <div class="name" onclick="editText(this)">Name</div>
+
+        <div class="bar">
+            <div class="left">
+                <span onclick="editText(this)">🏳️</span>
+                <span class="badge" onclick="editText(this)">0</span>
+                <span class="badge" onclick="editText(this)">0</span>
+            </div>
+            <span class="type" onclick="cycleType(this)">---</span>
+        </div>
+    `;
+
+    return div;
+}
+
+function addCard() {
+    const c = document.getElementById("container");
+    if (c.children.length < maxCards) c.appendChild(createCard());
+}
+
+function editText(el) {
+    const val = prompt("Wert eingeben:", el.innerText);
+    if (val !== null) el.innerText = val;
+}
+
+function cycleType(el) {
+    const types = ["ERZ","TRA","KON","MOD","REF","LIB","PRO"];
+    let i = types.indexOf(el.innerText);
+    i = (i + 1) % types.length;
+    el.innerText = types[i];
+    el.style.background = colors[types[i]];
+}
+
+function uploadImage(div) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = ev => {
+            div.style.backgroundImage = `url(${ev.target.result})`;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    input.click();
+}
+
+/* ===== MATRIX CODE ===== */
+
+let rounds = 0;
+let candidates = 0;
+let threshold = 80;
+
+function updateThreshold() {
+    const total = Number(document.getElementById("total").value) || 0;
+    threshold = Math.ceil((2/3) * total);
+    document.getElementById("thresholdDisplay").innerText = threshold;
+    checkMajority();
+}
+
+function addCandidate() {
+    candidates++;
+
+    const th = document.createElement("th");
+    th.innerHTML = `<input class="name" placeholder="Name">`;
+    document.getElementById("header").appendChild(th);
+
+    const rows = document.querySelectorAll("#body tr");
+    rows.forEach(row => {
+        const td = document.createElement("td");
+        td.innerHTML = `<input type="number" value="0" oninput="checkMajority()">`;
+        row.appendChild(td);
+    });
+}
+
+function addRound() {
+    rounds++;
+
+    const tr = document.createElement("tr");
+
+    let row = `
+        <td><b>WG ${rounds}</b></td>
+        <td class="need">benötigt: <span>${threshold}</span></td>
+    `;
+
+    for (let i = 0; i < candidates; i++) {
+        row += `<td><input type="number" value="0" oninput="checkMajority()"></td>`;
+    }
+
+    tr.innerHTML = row;
+    document.getElementById("body").appendChild(tr);
+}
+
+function checkMajority() {
+    const rows = document.querySelectorAll("#body tr");
+
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll("td input");
+
+        inputs.forEach(i => {
+            i.classList.remove("gold");
+
+            if (Number(i.value) >= threshold && threshold > 0) {
+                i.classList.add("gold");
+            }
+        });
+
+        const needSpan = row.querySelector(".need span");
+        if (needSpan) needSpan.innerText = threshold;
+    });
+}
+
+/* ===== START ===== */
+
+updateThreshold();
+for (let i = 0; i < 5; i++) addCard();
+for (let i = 0; i < 3; i++) addCandidate();
+for (let i = 0; i < 3; i++) addRound();
+
+</script>
+
+</body>
+</html>
